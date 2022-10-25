@@ -4,9 +4,13 @@ const project = new awscdk.AwsCdkTypeScriptApp({
   defaultReleaseBranch: 'main',
   name: 'pipeline',
 
-  // deps: [],                /* Runtime dependencies of this module. */
+  deps: [
+    'aws-sdk',
+  ],
   // description: undefined,  /* The description is just a string that helps people understand the purpose of the package. */
-  // devDeps: [],             /* Build dependencies for this module. */
+  devDeps: [
+    '@types/aws-lambda',
+  ],
   // packageName: undefined,  /* The "name" in package.json. */
 });
 project.synth();
