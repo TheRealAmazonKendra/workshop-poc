@@ -7,6 +7,7 @@ import { Effect, PolicyStatement } from 'aws-cdk-lib/aws-iam';
 import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { Construct } from 'constructs';
 import { Calendar } from '../calendar/calendar';
+// import { Function } from 'aws-cdk-lib/aws-lambda';
 
 export interface ChangeControllerProps {
   calendar: Calendar;
@@ -24,8 +25,10 @@ export class ChangeController extends Construct {
   constructor(scope: Construct, id: string, props: ChangeControllerProps) {
     super(scope, id);
 
+    // Function.fromFunctionName(this, )
+
     const fn = new NodejsFunction(this, `ChangeController${props.stage.pipeline.pipelineName}${props.stage.stageName}`, {
-      entry: path.join(__dirname, 'change-controller.handler.js'),
+      entry: path.join(__dirname, 'change-controller.handler.ts'),
     });
 
     // Grant permission for stage transitions

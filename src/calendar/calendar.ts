@@ -80,7 +80,7 @@ class CustomResourceCalendar extends Calendar {
     this.calendarName = options.calendarName;
 
     const onEvent: aws_lambda.Function = new aws_lambda_nodejs.NodejsFunction(scope, 'OnEventHandler', {
-      entry: path.join(__dirname, 'calendar-source.js'),
+      entry: path.join(__dirname, 'calendar-source.lambda.ts'),
     });
 
     const provider = new custom_resources.Provider(scope, 'Provider', {
