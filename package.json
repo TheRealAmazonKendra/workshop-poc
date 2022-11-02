@@ -3,8 +3,10 @@
   "scripts": {
     "build": "npx projen build",
     "bundle": "npx projen bundle",
-    "bundle:calendar/calendar-source.lambda": "npx projen bundle:calendar/calendar-source.lambda",
-    "bundle:calendar/calendar-source.lambda:watch": "npx projen bundle:calendar/calendar-source.lambda:watch",
+    "bundle:calendar/calendar-setup.lambda": "npx projen bundle:calendar/calendar-setup.lambda",
+    "bundle:calendar/calendar-setup.lambda:watch": "npx projen bundle:calendar/calendar-setup.lambda:watch",
+    "bundle:change-controller/change-controller.lambda": "npx projen bundle:change-controller/change-controller.lambda",
+    "bundle:change-controller/change-controller.lambda:watch": "npx projen bundle:change-controller/change-controller.lambda:watch",
     "clobber": "npx projen clobber",
     "compile": "npx projen compile",
     "default": "npx projen default",

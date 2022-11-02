@@ -1,30 +1,42 @@
 import { App, Duration, Stack, StackProps } from 'aws-cdk-lib';
-import { Repository } from 'aws-cdk-lib/aws-codecommit';
+import { Alarm, Metric } from 'aws-cdk-lib/aws-cloudwatch';
+import { Code, Repository } from 'aws-cdk-lib/aws-codecommit';
 import { Schedule } from 'aws-cdk-lib/aws-events';
 import { Construct } from 'constructs';
 import { Calendar } from './calendar/calendar';
-import { PipelineWithChangeControl } from './pipeline/pipeline';
+import { PipelineWithChangeControl } from './pipeline';
 
 export class MyStack extends Stack {
   constructor(scope: Construct, id: string, props: StackProps = {}) {
     super(scope, id, props);
 
+    const repositoryName: string = 'CodeCommitSUUUCKS';
     const sourceRepository = new Repository(this, 'Repository', {
-      repositoryName: 'CodeCommitSomethingSomething',
+      repositoryName,
+      code: Code.fromDirectory('../codepipeline-enhancements', 'main'),
+    });
+
+    const metric = new Metric({
+      namespace: 'DOP-401',
+      metricName: 'SomethingBroke',
+    });
+
+    new Alarm(this, 'alarm', {
+      metric,
+      alarmName: 'something-broke-alarm',
+      alarmDescription: 'no-deploy',
+      threshold: 1,
+      evaluationPeriods: 1,
     });
 
     new PipelineWithChangeControl(this, 'PipelineWithChangeControl', {
-      changeControlCalendar: Calendar.s3Location({
-        bucketName: 'someBucket',
-        calendarName: 'PretendCalendar',
+      changeControlCalendar: Calendar.path({
+        calendarName: 'calendar.ics',
       }),
       pipelineName: 'PipelineWithChangeControl',
       sourceRepository,
       changeControlCheckSchedule: Schedule.rate(Duration.minutes(1)),
-      changecontrolAlarmProps: {
-        roleArn: 'somerole',
-        searchTerms: ['this-pipeline', 'something-else'],
-      },
+      searchTerms: ['no-deploy'],
     });
   }
 };
@@ -37,7 +49,6 @@ const devEnv = {
 
 const app = new App();
 
-new MyStack(app, 'pipeline-dev', { env: devEnv });
-// new MyStack(app, 'pipeline-prod', { env: prodEnv });
+new MyStack(app, 'demo-pipeline', { env: devEnv });
 
 app.synth();

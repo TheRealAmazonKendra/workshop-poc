@@ -1,5 +1,3 @@
-import fs from 'fs';
-import path from 'path';
 import { OnEventRequest, OnEventResponse } from 'aws-cdk-lib/custom-resources/lib/provider-framework/types'; // eslint-disable-line import/no-unresolved
 import { S3, SSM } from 'aws-sdk';
 import { CalendarSourceType } from './calendar';
@@ -13,7 +11,7 @@ export const handler = async (event: OnEventRequest): Promise<OnEventResponse> =
   let calendar: string;
 
   if (event.ResourceProperties.sourceType === CalendarSourceType.PATH) {
-    calendar = fs.readFileSync(path.join(calendarPath, calendarName), { encoding: 'utf-8' });
+    calendar = event.ResourceProperties.calendarBody;
   } else {
     const s3 = new S3();
     calendar = (await s3.getObject({
@@ -28,6 +26,8 @@ export const handler = async (event: OnEventRequest): Promise<OnEventResponse> =
     const createDocumentRepsonse = await ssm.createDocument({
       Name: calendarName,
       Content: calendar,
+      DocumentType: 'ChangeCalendar',
+      DocumentFormat: 'TEXT',
     }).promise();
     console.log('Create document: %j', createDocumentRepsonse);
   }
@@ -36,6 +36,7 @@ export const handler = async (event: OnEventRequest): Promise<OnEventResponse> =
     const updateDocumentResponse = await ssm.updateDocument({
       Name: calendarName,
       Content: calendar,
+      DocumentVersion: '$LATEST',
     }).promise();
     console.log('Update document: %j', updateDocumentResponse);
   }

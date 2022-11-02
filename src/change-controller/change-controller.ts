@@ -1,35 +1,24 @@
-import path from 'path';
 import { ComparisonOperator, TreatMissingData } from 'aws-cdk-lib/aws-cloudwatch';
 import { IStage } from 'aws-cdk-lib/aws-codepipeline';
 import { Rule, RuleTargetInput, Schedule } from 'aws-cdk-lib/aws-events';
 import { LambdaFunction } from 'aws-cdk-lib/aws-events-targets';
 import { Effect, PolicyStatement } from 'aws-cdk-lib/aws-iam';
-import { NodejsFunction } from 'aws-cdk-lib/aws-lambda-nodejs';
 import { Construct } from 'constructs';
 import { Calendar } from '../calendar/calendar';
-// import { Function } from 'aws-cdk-lib/aws-lambda';
+import { ChangeControllerFunction } from './change-controller-function';
 
 export interface ChangeControllerProps {
   calendar: Calendar;
   stage: IStage;
   schedule: Schedule;
-  changeControlAlarmProps: ChangeControlAlarmProps;
-};
-
-export interface ChangeControlAlarmProps {
-  roleArn: string;
   searchTerms: string[];
-}
+};
 
 export class ChangeController extends Construct {
   constructor(scope: Construct, id: string, props: ChangeControllerProps) {
     super(scope, id);
 
-    // Function.fromFunctionName(this, )
-
-    const fn = new NodejsFunction(this, `ChangeController${props.stage.pipeline.pipelineName}${props.stage.stageName}`, {
-      entry: path.join(__dirname, 'change-controller.handler.ts'),
-    });
+    const fn = new ChangeControllerFunction(this, 'ChangeControllerLambda');
 
     // Grant permission for stage transitions
     fn.addToRolePolicy(
@@ -47,17 +36,17 @@ export class ChangeController extends Construct {
     // Grant permission to retrieve calendars
     fn.addToRolePolicy(
       new PolicyStatement({
-        resources: ['*'],
+        resources: [props.calendar.calendarArn],
         actions: ['ssm:GetCalendarState'],
         effect: Effect.ALLOW,
       }),
     );
 
-    // Grant permission to assume alarm roles
+    // Grant permisssion to check alarm states
     fn.addToRolePolicy(
       new PolicyStatement({
-        resources: [props.changeControlAlarmProps.roleArn],
-        actions: ['sts:AssumeRole'],
+        resources: ['*'],
+        actions: ['cloudwatch:DescribeAlarms'],
         effect: Effect.ALLOW,
       }),
     );
@@ -79,8 +68,9 @@ export class ChangeController extends Construct {
         new LambdaFunction(fn, {
           event: RuleTargetInput.fromObject({
             calendar: props.calendar,
-            changeControlAlarmProps: props.changeControlAlarmProps,
-            stage: props.stage,
+            searchTerms: props.searchTerms,
+            stageName: props.stage.stageName,
+            pipelineName: props.stage.pipeline.pipelineName,
           }),
         }),
       ],

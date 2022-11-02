@@ -1,7 +1,12 @@
-import path from 'path';
-import { aws_lambda_nodejs, custom_resources, aws_lambda, CustomResource } from 'aws-cdk-lib';
-import { Role } from 'aws-cdk-lib/aws-iam';
+import * as fs from 'fs';
+import * as path from 'path';
+import { CustomResource, Arn, Stack } from 'aws-cdk-lib';
+import { IRole, PolicyStatement } from 'aws-cdk-lib/aws-iam';
+import { Function } from 'aws-cdk-lib/aws-lambda';
+import { IBucket } from 'aws-cdk-lib/aws-s3';
+import { Provider } from 'aws-cdk-lib/custom-resources';
 import { Construct } from 'constructs';
+import { CalendarSetupFunction } from './calendar-setup-function';
 
 export interface CalendarLocationOptionsBase {
   calendarName: string;
@@ -9,8 +14,8 @@ export interface CalendarLocationOptionsBase {
 };
 
 export interface S3LocationOptions extends CalendarLocationOptionsBase {
-  bucketName: string;
-  roleArn?: string;
+  bucket: IBucket;
+  role?: IRole;
 };
 
 export enum CalendarSourceType {
@@ -19,36 +24,48 @@ export enum CalendarSourceType {
 };
 
 export abstract class Calendar {
-  public static calendarName: string;
-
-  public static path(options: CalendarLocationOptionsBase) {
+  public static path(options: CalendarLocationOptionsBase): Calendar {
     return new class extends Calendar {
-      public calendarName = options.calendarName;
+
       public _bind(scope: Construct): Calendar {
-        return new CustomResourceCalendar(scope, {
+        const localPath = options.calendarPath ? options.calendarPath : __dirname;
+        const calendarBody = fs.readFileSync(path.join(localPath, options.calendarName), { encoding: 'utf-8' });
+
+        const calendar = new CustomResourceCalendar(scope, {
           sourceType: CalendarSourceType.PATH,
-          calendarPath: options.calendarPath ? options.calendarPath : __dirname,
+          calendarBody,
           calendarName: options.calendarName,
         });
+
+        this.calendarArn = calendar.calendarArn;
+        this.calendarName = calendar.calendarName;
+
+        return calendar;
       }
     };
   }
 
   public static s3Location(options: S3LocationOptions): Calendar {
     return new class extends Calendar {
-      public calendarName = options.calendarName;
+
       public _bind(scope: Construct): Calendar {
-        return new CustomResourceCalendar(scope, {
+        const calendar = new CustomResourceCalendar(scope, {
           sourceType: CalendarSourceType.S3Object,
-          calendarPath: options.bucketName,
-          calendarName: `${options.calendarPath}/${options.calendarName}`,
-          roleArn: options.roleArn,
+          bucketName: options.bucket.bucketName,
+          calendarName: options.calendarName,
+          roleArn: options.role?.roleArn,
         });
+
+        this.calendarArn = calendar.calendarArn;
+        this.calendarName = calendar.calendarName;
+
+        return calendar;
       }
     };
   }
 
-  public abstract readonly calendarName: string;
+  public calendarName!: string;
+  public calendarArn!: string;
 
   protected constructor() {}
 
@@ -61,38 +78,40 @@ export abstract class Calendar {
 
 interface CustomResourceCalendarOptions extends CalendarLocationOptionsBase {
   sourceType: CalendarSourceType;
-  calendarPath: string;
+  calendarBody?: string;
+  bucketName?: string;
   roleArn?: string;
 }
 
 class CustomResourceCalendar extends Calendar {
-  public readonly sourceType: string;
-  public readonly calendarPath: string;
-  public readonly roleArn?: string;
-  public readonly calendarName: string;
-
   constructor(scope: Construct, options: CustomResourceCalendarOptions) {
     super();
 
-    this.sourceType = options.sourceType;
-    this.calendarPath = options.calendarPath;
-    this.roleArn = options.roleArn;
     this.calendarName = options.calendarName;
+    this.calendarArn = Arn.format({
+      service: 'ssm',
+      resource: 'document',
+      resourceName: options.calendarName,
+    }, Stack.of(scope));
 
-    const onEvent: aws_lambda.Function = new aws_lambda_nodejs.NodejsFunction(scope, 'OnEventHandler', {
-      entry: path.join(__dirname, 'calendar-source.lambda.ts'),
-    });
+    const onEvent: Function = new CalendarSetupFunction(scope, 'OnEventHandler');
+    onEvent.addToRolePolicy(new PolicyStatement({
+      actions: ['ssm:CreateDocument', 'ssm:UpdateDocument', 'ssm:DeleteDocument'],
+      resources: [this.calendarArn],
+    }));
 
-    const provider = new custom_resources.Provider(scope, 'Provider', {
+    const provider = new Provider(scope, 'Provider', {
       onEventHandler: onEvent,
-      role: this.roleArn ? Role.fromRoleArn(scope, '', this.roleArn) : undefined,
     });
 
     new CustomResource(scope, 'SSMCalendarCustomResource', {
       serviceToken: provider.serviceToken,
       properties: {
-        sourceType: this.sourceType,
-        path: this.calendarPath,
+        sourceType: options.sourceType,
+        calendarBody: options.calendarBody,
+        calendarPath: options.calendarPath,
+        calendarName: options.calendarName,
+        roleArn: options.roleArn,
       },
     });
   }

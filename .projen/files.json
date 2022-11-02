@@ -14,6 +14,8 @@
     ".projen/tasks.json",
     "cdk.json",
     "LICENSE",
+    "src/calendar/calendar-setup-function.ts",
+    "src/change-controller/change-controller-function.ts",
     "tsconfig.dev.json",
     "tsconfig.json"
   ],

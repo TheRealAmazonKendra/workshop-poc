@@ -50,3 +50,5 @@ junit.xml
 /cdk.out/
 .cdk.staging/
 .parcel-cache/
+!/src/calendar/calendar-setup-function.ts
+!/src/change-controller/change-controller-function.ts
